@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pickup Games - Weekly Schedule</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Pickup Games</h1>
+      <p class="subtitle">Find and join games in your area</p>
+    </header>
+
+    <section class="week-calendar">
+      <h2 class="section-title">This Week's Schedule</h2>
+      <div class="days-grid" id="days-grid">
+        <!-- Days will be dynamically generated -->
+      </div>
+    </section>
+
+    <section class="games-section">
+      <h2 class="section-title">Available Games - <span id="selected-day">Monday</span></h2>
+      <div class="games-list" id="games-list">
+        <div class="loading-spinner">
+          <div class="spinner"></div>
+          <p>Loading games...</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal" id="registration-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close" aria-label="Close modal">&times;</button>
+      <h2 class="modal-title">Join <span id="game-title-modal"></span></h2> 
+      <p class="modal-subtitle">Fill in your details to register for this game</p>
+      
+      <form class="registration-form" id="registration-form" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="first-name">First Name</label>
+            <input type="text" id="first-name" name="first-name" required aria-required="true">
+            <span class="error-message"></span>
+          </div>
+          <div class="form-group">
+            <label for="last-name">Last Name</label>
+            <input type="text" id="last-name" name="last-name" required aria-required="true">
+            <span class="error-message"></span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" required aria-required="true">
+          <span class="error-message"></span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" required aria-required="true">
+            <span class="error-message"></span>
+          </div>
+          <div class="form-group">
+            <label for="age">Age</label>
+            <input type="number" id="age" name="age" min="13" max="99" required aria-required="true">
+            <span class="error-message"></span>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn">Register for Game</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
