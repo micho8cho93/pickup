@@ -2,7 +2,7 @@
 // Configuration
 // ============================================
 const CONFIG = {
-  API_BASE_URL: 'http://127.0.0.1:8000/futbol/api/games',
+  API_BASE_URL: 'https://testliga.up.railway.app/futbol/api/games',
   GAME_DURATION_HOURS: 2,
   DAYS_OF_WEEK: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
   DAY_ABBREVIATIONS: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -78,50 +78,60 @@ const utils = {
 // API Functions
 // ============================================
 const api = {
+  // GET all games from Django backend
   async fetchGames() {
     try {
-      const response = await fetch(CONFIG.API_BASE_URL);
-      
+      const response = await fetch(CONFIG.API_BASE_URL, {
+        credentials: 'include', // needed if backend requires auth/cookies
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
       const games = await response.json();
-      console.log('Fetched Games:', games);
-      
       state.games = games;
       ui.renderGames(games);
       ui.renderDayCards(games);
-
     } catch (error) {
       console.error('Could not fetch pickup games:', error);
       ui.showError('Error loading games. Please check your connection and try again.');
     }
   },
 
+  // POST registration to Django backend
   async submitRegistration(formData) {
     if (!state.registeringGameId) {
       ui.showAlert('Error: No game selected for registration.');
       return;
     }
-    
-    console.log('Registering for Game ID:', state.registeringGameId, 'with data:', formData);
-    
-    // TODO: Implement actual API call
-    // const registerUrl = `${CONFIG.API_BASE_URL}/register/`;
-    // const response = await fetch(registerUrl, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ ...formData, game_id: state.registeringGameId })
-    // });
-    
-    // Simulate success
-    await new Promise(resolve => setTimeout(resolve, 500));
-    ui.showAlert('Registration successful! You have been signed up for the game.');
-    modal.close();
-    
-    // Refresh games after registration
-    // await api.fetchGames();
+
+    try {
+      const registerUrl = `${CONFIG.API_BASE_URL}/register/`;
+      const response = await fetch(registerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_id: state.registeringGameId, ...formData }),
+        credentials: 'include' // just in case auth/cookies/session are needed
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        ui.showAlert(result.message || 'Registration successful! You have been signed up for the game.');
+        modal.close();
+        // Optionally re-fetch games, if player count changes
+        // await api.fetchGames();
+      } else {
+        // Backend should return {error: "..."}
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed! Try again.');
+      }
+    } catch (error) {
+      ui.showAlert(`Registration failed: ${error.message}`);
+    }
   }
 };
 
