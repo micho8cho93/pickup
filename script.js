@@ -132,12 +132,19 @@ const api = {
       if (response.ok) {
         const result = await response.json();
         ui.showAlert('Registration successful! You have been signed up for the game.');
+        // Reset the form
+        DOM.registrationForm.reset();
+        // Clear any validation errors
+        DOM.registrationForm.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+        DOM.registrationForm.querySelectorAll('.error-message').forEach(el => el.textContent = '');
         modal.close();
         // Re-fetch games to update player count
         await api.fetchGames();
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Registration failed! Try again.' }));
-        throw new Error(errorData.error || errorData.detail || 'Registration failed! Try again.');
+        // Log the error for debugging
+        console.error('Registration error:', errorData);
+        throw new Error(errorData.error || errorData.detail || errorData.pickup_game || 'Registration failed! Try again.');
       }
     } catch (error) {
       ui.showAlert(`Registration failed: ${error.message}`);
