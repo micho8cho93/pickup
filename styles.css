@@ -239,8 +239,15 @@ body {
   content: "📍 ";
 }
 
-.join-btn {
-  width: 100%;
+.game-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.join-btn,
+.players-btn {
+  flex: 1;
   background: linear-gradient(135deg, var(--color-accent-orange) 0%, var(--color-accent-red) 100%);
   color: #ffffff;
   border: none;
@@ -253,13 +260,26 @@ body {
   font-family: inherit;
 }
 
-.join-btn:hover {
+.join-btn:hover,
+.players-btn:hover {
   transform: scale(1.02);
   box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
 }
 
-.join-btn:active {
+.join-btn:active,
+.players-btn:active {
   transform: scale(0.98);
+}
+
+.players-btn {
+  background: var(--color-bg-tertiary);
+  border: 2px solid var(--color-border);
+}
+
+.players-btn:hover {
+  background: var(--color-bg-primary);
+  border-color: var(--color-accent-orange);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.2);
 }
 
 /* Error Message Box */
@@ -460,6 +480,10 @@ body {
     .game-cards {
       grid-template-columns: 1fr;
     }
+
+    .game-buttons {
+      flex-direction: column;
+    }
   
     .modal-content {
       margin: 20px;
@@ -533,15 +557,45 @@ body {
     outline-offset: 2px;
   }
   
+  /* Players List Styles */
+  .players-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    max-height: 400px;
+    overflow-y: auto;
+    padding: var(--spacing-xs);
+  }
+
+  .player-item {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    transition: all var(--transition-fast);
+  }
+
+  .player-item:hover {
+    border-color: var(--color-accent-orange);
+    background: var(--color-bg-tertiary);
+  }
+
+  .player-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
   /* Print styles */
   @media print {
     body {
       background: white;
       color: black;
     }
-  
+
     .modal,
-    .join-btn {
+    .join-btn,
+    .players-btn {
       display: none;
     }
   }

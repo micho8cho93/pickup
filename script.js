@@ -3,6 +3,7 @@
 // ============================================
 const CONFIG = {
   API_BASE_URL: 'https://testliga.up.railway.app/futbol/api/games',
+  API_PLAYERS_URL: 'https://testliga.up.railway.app/futbol/api/game-players',
   GAME_DURATION_HOURS: 2,
   DAYS_OF_WEEK: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
   DAY_ABBREVIATIONS: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -27,7 +28,11 @@ const DOM = {
   modal: document.getElementById('registration-modal'),
   modalClose: document.getElementById('modal-close'),
   gameTitleSpan: document.getElementById('game-title-modal'),
-  registrationForm: document.getElementById('registration-form')
+  registrationForm: document.getElementById('registration-form'),
+  playersModal: document.getElementById('players-modal'),
+  playersModalClose: document.getElementById('players-modal-close'),
+  playersGameTitleSpan: document.getElementById('players-game-title-modal'),
+  playersList: document.getElementById('players-list')
 };
 
 // ============================================
@@ -110,27 +115,54 @@ const api = {
     }
 
     try {
-      const registerUrl = `${CONFIG.API_BASE_URL}/register/`;
-      const response = await fetch(registerUrl, {
+      const response = await fetch(CONFIG.API_PLAYERS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_id: state.registeringGameId, ...formData }),
-        credentials: 'include' // just in case auth/cookies/session are needed
+        body: JSON.stringify({
+          pickup_game: parseInt(state.registeringGameId),
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          email: formData.email,
+          phone_number: formData.phone_number,
+          age: formData.age
+        }),
+        credentials: 'include'
       });
 
       if (response.ok) {
         const result = await response.json();
-        ui.showAlert(result.message || 'Registration successful! You have been signed up for the game.');
+        ui.showAlert('Registration successful! You have been signed up for the game.');
         modal.close();
-        // Optionally re-fetch games, if player count changes
-        // await api.fetchGames();
+        // Re-fetch games to update player count
+        await api.fetchGames();
       } else {
-        // Backend should return {error: "..."}
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Registration failed! Try again.');
+        const errorData = await response.json().catch(() => ({ error: 'Registration failed! Try again.' }));
+        throw new Error(errorData.error || errorData.detail || 'Registration failed! Try again.');
       }
     } catch (error) {
       ui.showAlert(`Registration failed: ${error.message}`);
+    }
+  },
+
+  // GET players for a specific game
+  async fetchPlayersForGame(gameId) {
+    try {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/${gameId}/`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const game = await response.json();
+      return game.players || [];
+    } catch (error) {
+      console.error('Could not fetch players:', error);
+      throw error;
     }
   }
 };
@@ -205,9 +237,14 @@ const ui = {
           <p class="game-time">${utils.formatGameTime(game.time)}</p>
           <p class="game-location">${game.location}</p>
         </div>
-        <button class="join-btn" data-game-id="${game.id}" data-game-title="${game.location} Pickup">
-          Join Game
-        </button>
+        <div class="game-buttons">
+          <button class="join-btn" data-game-id="${game.id}" data-game-title="${game.location} Pickup">
+            Join Game
+          </button>
+          <button class="players-btn" data-game-id="${game.id}" data-game-title="${game.location} Pickup">
+            List of Players
+          </button>
+        </div>
       </article>
     `;
   },
@@ -252,6 +289,14 @@ const ui = {
         modal.open();
       });
     });
+    
+    document.querySelectorAll('.players-btn').forEach(button => {
+      button.addEventListener('click', function() {
+        const gameId = this.dataset.gameId;
+        const gameTitle = this.dataset.gameTitle;
+        playersModal.open(gameId, gameTitle);
+      });
+    });
   }
 };
 
@@ -277,6 +322,61 @@ const modal = {
     document.querySelectorAll('.form-group input').forEach(input => {
       input.classList.remove('error');
     });
+  }
+};
+
+// ============================================
+// Players Modal Controller
+// ============================================
+const playersModal = {
+  async open(gameId, gameTitle) {
+    DOM.playersGameTitleSpan.textContent = gameTitle;
+    DOM.playersModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Show loading state
+    DOM.playersList.innerHTML = `
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Loading players...</p>
+      </div>
+    `;
+    
+    try {
+      const players = await api.fetchPlayersForGame(gameId);
+      this.renderPlayers(players);
+    } catch (error) {
+      DOM.playersList.innerHTML = `
+        <div class="error-message-box">
+          <p>Error loading players. Please try again.</p>
+        </div>
+      `;
+    }
+  },
+
+  renderPlayers(players) {
+    if (players.length === 0) {
+      DOM.playersList.innerHTML = '<p class="no-games">No players signed up yet.</p>';
+      return;
+    }
+    
+    const playersHTML = players.map(player => `
+      <div class="player-item">
+        <span class="player-name">${player.first_name}</span>
+      </div>
+    `).join('');
+    
+    DOM.playersList.innerHTML = `
+      <div class="players-container">
+        ${playersHTML}
+      </div>
+    `;
+  },
+
+  close() {
+    DOM.playersModal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+    DOM.playersList.innerHTML = '';
   }
 };
 
@@ -382,11 +482,21 @@ const events = {
     DOM.modalClose.addEventListener('click', () => modal.close());
     DOM.modal.querySelector('.modal-overlay').addEventListener('click', () => modal.close());
     DOM.modal.querySelector('.modal-content').addEventListener('click', (e) => e.stopPropagation());
+    
+    // Players modal close events
+    DOM.playersModalClose.addEventListener('click', () => playersModal.close());
+    DOM.playersModal.querySelector('.modal-overlay').addEventListener('click', () => playersModal.close());
+    DOM.playersModal.querySelector('.modal-content').addEventListener('click', (e) => e.stopPropagation());
 
-    // ESC key to close modal
+    // ESC key to close modals
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && DOM.modal.classList.contains('active')) {
-        modal.close();
+      if (e.key === 'Escape') {
+        if (DOM.modal.classList.contains('active')) {
+          modal.close();
+        }
+        if (DOM.playersModal.classList.contains('active')) {
+          playersModal.close();
+        }
       }
     });
 
@@ -402,7 +512,7 @@ const events = {
         first_name: document.getElementById('first-name').value.trim(),
         last_name: document.getElementById('last-name').value.trim(),
         email: document.getElementById('email').value.trim(),
-        phone: document.getElementById('phone').value.trim(),
+        phone_number: document.getElementById('phone').value.trim(),
         age: parseInt(document.getElementById('age').value)
       };
 
