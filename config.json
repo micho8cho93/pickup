@@ -1,0 +1,35 @@
+{
+  "currentEnvironment": "production",
+  "environments": {
+    "development": {
+      "frontendUrl": "http://localhost:3000",
+      "backendBaseUrl": "http://localhost:8000",
+      "db": "postgresql://pickup_dev",
+      "apiPaths": {
+        "games": "/futbol/api/games",
+        "players": "/futbol/api/game-players",
+        "health": "/futbol/api/health"
+      }
+    },
+    "staging": {
+      "frontendUrl": "https://staging.example.com/pickup",
+      "backendBaseUrl": "https://staging-api.example.com",
+      "db": "postgresql://pickup_staging",
+      "apiPaths": {
+        "games": "/futbol/api/games",
+        "players": "/futbol/api/game-players",
+        "health": "/futbol/api/health"
+      }
+    },
+    "production": {
+      "frontendUrl": "https://<github-username>.github.io/pickup/",
+      "backendBaseUrl": "https://testliga.up.railway.app",
+      "db": "railway: postgres production",
+      "apiPaths": {
+        "games": "/futbol/api/games",
+        "players": "/futbol/api/game-players",
+        "health": "/futbol/api/health"
+      }
+    }
+  }
+}

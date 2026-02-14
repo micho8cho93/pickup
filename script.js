@@ -1,12 +1,71 @@
 // ============================================
 // Configuration
 // ============================================
+const DEFAULT_RUNTIME_CONFIG = {
+  environment: 'production',
+  frontendUrl: 'https://<github-username>.github.io/pickup/',
+  backendBaseUrl: 'https://testliga.up.railway.app',
+  apiPaths: {
+    games: '/futbol/api/games',
+    players: '/futbol/api/game-players',
+    health: '/futbol/api/health'
+  }
+};
+
 const CONFIG = {
-  API_BASE_URL: 'https://testliga.up.railway.app/futbol/api/games',
-  API_PLAYERS_URL: 'https://testliga.up.railway.app/futbol/api/game-players',
+  ENVIRONMENT: DEFAULT_RUNTIME_CONFIG.environment,
+  FRONTEND_URL: DEFAULT_RUNTIME_CONFIG.frontendUrl,
+  BACKEND_BASE_URL: DEFAULT_RUNTIME_CONFIG.backendBaseUrl,
+  API_BASE_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.games}`,
+  API_PLAYERS_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.players}`,
+  API_HEALTH_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.health}`,
   GAME_DURATION_HOURS: 2,
   DAYS_OF_WEEK: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
   DAY_ABBREVIATIONS: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+};
+
+const runtimeConfig = {
+  async load() {
+    try {
+      const response = await fetch('config.json', { cache: 'no-store' });
+
+      if (!response.ok) {
+        throw new Error(`Unable to load config.json (status ${response.status})`);
+      }
+
+      const fileConfig = await response.json();
+      const merged = this.mergeWithDefaults(fileConfig);
+      this.apply(merged);
+      console.info(`[startup] Loaded runtime config for "${CONFIG.ENVIRONMENT}" from config.json`);
+    } catch (error) {
+      console.warn(`[startup] ${error.message}. Falling back to embedded defaults.`);
+      this.apply(DEFAULT_RUNTIME_CONFIG);
+    }
+  },
+
+  mergeWithDefaults(fileConfig) {
+    const selectedEnvironment = fileConfig?.currentEnvironment || DEFAULT_RUNTIME_CONFIG.environment;
+    const selectedEnvConfig = fileConfig?.environments?.[selectedEnvironment] || {};
+
+    return {
+      environment: selectedEnvironment,
+      frontendUrl: selectedEnvConfig.frontendUrl || DEFAULT_RUNTIME_CONFIG.frontendUrl,
+      backendBaseUrl: selectedEnvConfig.backendBaseUrl || DEFAULT_RUNTIME_CONFIG.backendBaseUrl,
+      apiPaths: {
+        ...DEFAULT_RUNTIME_CONFIG.apiPaths,
+        ...(selectedEnvConfig.apiPaths || {})
+      }
+    };
+  },
+
+  apply(nextConfig) {
+    CONFIG.ENVIRONMENT = nextConfig.environment;
+    CONFIG.FRONTEND_URL = nextConfig.frontendUrl;
+    CONFIG.BACKEND_BASE_URL = nextConfig.backendBaseUrl;
+    CONFIG.API_BASE_URL = `${nextConfig.backendBaseUrl}${nextConfig.apiPaths.games}`;
+    CONFIG.API_PLAYERS_URL = `${nextConfig.backendBaseUrl}${nextConfig.apiPaths.players}`;
+    CONFIG.API_HEALTH_URL = `${nextConfig.backendBaseUrl}${nextConfig.apiPaths.health}`;
+  }
 };
 
 // ============================================
@@ -15,7 +74,8 @@ const CONFIG = {
 const state = {
   games: [],
   selectedDay: 'monday',
-  registeringGameId: null
+  registeringGameId: null,
+  backendMetadata: null
 };
 
 // ============================================
@@ -42,11 +102,11 @@ const utils = {
   formatGameTime(isoString) {
     const startTime = new Date(isoString);
     const endTime = new Date(startTime.getTime() + (CONFIG.GAME_DURATION_HOURS * 60 * 60 * 1000));
-    
+
     const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
     const start = startTime.toLocaleTimeString('en-US', timeOptions);
     const end = endTime.toLocaleTimeString('en-US', timeOptions);
-    
+
     return `${start} - ${end}`;
   },
 
@@ -70,7 +130,7 @@ const utils = {
     const currentDay = today.getDay();
     const monday = new Date(today);
     monday.setDate(today.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
-    
+
     return CONFIG.DAYS_OF_WEEK.map((_, index) => {
       const date = new Date(monday);
       date.setDate(monday.getDate() + index);
@@ -83,14 +143,42 @@ const utils = {
 // API Functions
 // ============================================
 const api = {
+  async fetchBackendMetadata() {
+    try {
+      const response = await fetch(CONFIG.API_HEALTH_URL, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const metadata = await response.json();
+      state.backendMetadata = metadata;
+
+      console.info('[startup] Environment wiring confirmed:', {
+        frontend_environment: CONFIG.ENVIRONMENT,
+        frontend_url: CONFIG.FRONTEND_URL,
+        backend_url: CONFIG.BACKEND_BASE_URL,
+        backend_environment: metadata.environment || 'unknown',
+        backend_commit: metadata.commit || metadata.commit_hash || 'unknown'
+      });
+    } catch (error) {
+      console.warn(`[startup] Could not load backend metadata from ${CONFIG.API_HEALTH_URL}: ${error.message}`);
+    }
+  },
+
   // GET all games from Django backend
   async fetchGames() {
     try {
       const response = await fetch(CONFIG.API_BASE_URL, {
         credentials: 'include', // needed if backend requires auth/cookies
         headers: {
-          'Content-Type': 'application/json',
-        },
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!response.ok) {
@@ -182,8 +270,8 @@ const api = {
       const response = await fetch(`${CONFIG.API_PLAYERS_URL}/?pickup_game=${encodeURIComponent(gameId)}`, {
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-        },
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!response.ok) {
@@ -221,13 +309,13 @@ const ui = {
   renderDayCards(games) {
     const weekDates = utils.getCurrentWeekDates();
     const gameCounts = this.calculateGameCounts(games);
-    
+
     DOM.daysGrid.innerHTML = weekDates.map((date, index) => {
       const day = CONFIG.DAYS_OF_WEEK[index];
       const count = gameCounts[day] || 0;
       const dayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const isActive = day === state.selectedDay ? 'active' : '';
-      
+
       return `
         <button class="day-card ${isActive}" data-day="${day}">
           <span class="day-name">${CONFIG.DAY_ABBREVIATIONS[index]}</span>
@@ -236,7 +324,7 @@ const ui = {
         </button>
       `;
     }).join('');
-    
+
     this.attachDayCardListeners();
   },
 
@@ -250,13 +338,13 @@ const ui = {
 
   renderGames(games) {
     const gamesByDay = this.groupGamesByDay(games);
-    
+
     DOM.gamesListContainer.innerHTML = CONFIG.DAYS_OF_WEEK.map(day => `
       <div class="game-cards" data-day="${day}" style="display: ${day === state.selectedDay ? 'grid' : 'none'}">
         ${gamesByDay[day] ? gamesByDay[day].map(game => this.createGameCard(game)).join('') : '<p class="no-games">No games scheduled for this day.</p>'}
       </div>
     `).join('');
-    
+
     this.attachJoinButtonListeners();
   },
 
@@ -272,7 +360,7 @@ const ui = {
   createGameCard(game) {
     const spotsLeft = game.max_players - game.current_players;
     const gameType = game.sport || 'Soccer';
-    
+
     return `
       <article class="game-card">
         <div class="game-header">
@@ -300,7 +388,7 @@ const ui = {
     document.querySelectorAll('.game-cards').forEach(cards => {
       cards.style.display = cards.dataset.day === selectedDay ? 'grid' : 'none';
     });
-    
+
     DOM.selectedDayText.textContent = utils.capitalizeFirstLetter(selectedDay);
     state.selectedDay = selectedDay;
   },
@@ -336,7 +424,7 @@ const ui = {
         modal.open();
       });
     });
-    
+
     document.querySelectorAll('.players-btn').forEach(button => {
       button.addEventListener('click', function() {
         const gameId = this.dataset.gameId;
@@ -380,7 +468,7 @@ const playersModal = {
     DOM.playersGameTitleSpan.textContent = gameTitle;
     DOM.playersModal.classList.add('active');
     document.body.style.overflow = 'hidden';
-    
+
     // Show loading state
     DOM.playersList.innerHTML = `
       <div class="loading-spinner">
@@ -388,7 +476,7 @@ const playersModal = {
         <p>Loading players...</p>
       </div>
     `;
-    
+
     try {
       const players = await api.fetchPlayersForGame(gameId);
       this.renderPlayers(players);
@@ -406,7 +494,7 @@ const playersModal = {
       DOM.playersList.innerHTML = '<p class="no-games">No players signed up yet.</p>';
       return;
     }
-    
+
     const playersHTML = players.map(player => {
       const firstName = player.first_name || player.user?.first_name || 'Player';
 
@@ -416,7 +504,7 @@ const playersModal = {
       </div>
     `;
     }).join('');
-    
+
     DOM.playersList.innerHTML = `
       <div class="players-container">
         ${playersHTML}
@@ -486,12 +574,12 @@ const validation = {
       return false;
     }
 
-    if (rule.min && parseInt(value) < rule.min) {
+    if (rule.min && parseInt(value, 10) < rule.min) {
       this.showError(input, errorElement, rule.message);
       return false;
     }
 
-    if (rule.max && parseInt(value) > rule.max) {
+    if (rule.max && parseInt(value, 10) > rule.max) {
       this.showError(input, errorElement, rule.message);
       return false;
     }
@@ -533,7 +621,7 @@ const events = {
     DOM.modalClose.addEventListener('click', () => modal.close());
     DOM.modal.querySelector('.modal-overlay').addEventListener('click', () => modal.close());
     DOM.modal.querySelector('.modal-content').addEventListener('click', (e) => e.stopPropagation());
-    
+
     // Players modal close events
     DOM.playersModalClose.addEventListener('click', () => playersModal.close());
     DOM.playersModal.querySelector('.modal-overlay').addEventListener('click', () => playersModal.close());
@@ -554,7 +642,7 @@ const events = {
     // Form submission
     DOM.registrationForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       if (!validation.validateForm(DOM.registrationForm)) {
         return;
       }
@@ -564,7 +652,7 @@ const events = {
         last_name: document.getElementById('last-name').value.trim(),
         email: document.getElementById('email').value.trim(),
         phone_number: document.getElementById('phone').value.trim(),
-        age: parseInt(document.getElementById('age').value)
+        age: parseInt(document.getElementById('age').value, 10)
       };
 
       await api.submitRegistration(formData);
@@ -587,8 +675,10 @@ const events = {
 // ============================================
 const app = {
   async init() {
+    await runtimeConfig.load();
     console.log('🚀 Pickup Games App Initialized');
     events.init();
+    await api.fetchBackendMetadata();
     await api.fetchGames();
   }
 };
