@@ -138,6 +138,26 @@ const utils = {
       date.setDate(monday.getDate() + index);
       return date;
     });
+  },
+
+  getCurrentWeekRange() {
+    const weekDates = this.getCurrentWeekDates();
+    const weekStart = new Date(weekDates[0]);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEnd = new Date(weekDates[6]);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    return { weekStart, weekEnd };
+  },
+
+  filterGamesForCurrentWeek(games) {
+    const { weekStart, weekEnd } = this.getCurrentWeekRange();
+
+    return games.filter(game => {
+      const gameDate = new Date(game.time);
+      return gameDate >= weekStart && gameDate <= weekEnd;
+    });
   }
 };
 
@@ -188,9 +208,11 @@ const api = {
       }
 
       const games = await response.json();
-      state.games = games;
-      ui.renderGames(games);
-      ui.renderDayCards(games);
+      const currentWeekGames = utils.filterGamesForCurrentWeek(games);
+
+      state.games = currentWeekGames;
+      ui.renderGames(currentWeekGames);
+      ui.renderDayCards(currentWeekGames);
     } catch (error) {
       console.error('Could not fetch pickup games:', error);
       ui.showError('Error loading games. Please check your connection and try again.');
