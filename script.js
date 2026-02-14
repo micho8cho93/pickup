@@ -154,7 +154,7 @@ const api = {
   // GET players for a specific game
   async fetchPlayersForGame(gameId) {
     try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}/${gameId}/`, {
+      const response = await fetch(`${CONFIG.API_PLAYERS_URL}/?pickup_game=${encodeURIComponent(gameId)}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -165,8 +165,23 @@ const api = {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const game = await response.json();
-      return game.players || [];
+      const responseBody = await response.json();
+
+      // Handle common DRF list/pagination response shapes
+      if (Array.isArray(responseBody)) {
+        return responseBody;
+      }
+
+      if (Array.isArray(responseBody?.results)) {
+        return responseBody.results;
+      }
+
+      // Fallback for legacy game detail serializer that embeds players
+      if (Array.isArray(responseBody?.players)) {
+        return responseBody.players;
+      }
+
+      return [];
     } catch (error) {
       console.error('Could not fetch players:', error);
       throw error;
@@ -367,11 +382,15 @@ const playersModal = {
       return;
     }
     
-    const playersHTML = players.map(player => `
+    const playersHTML = players.map(player => {
+      const firstName = player.first_name || player.user?.first_name || 'Player';
+
+      return `
       <div class="player-item">
-        <span class="player-name">${player.first_name}</span>
+        <span class="player-name">${firstName}</span>
       </div>
-    `).join('');
+    `;
+    }).join('');
     
     DOM.playersList.innerHTML = `
       <div class="players-container">
