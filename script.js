@@ -114,23 +114,48 @@ const api = {
       return;
     }
 
+    const pickupGameId = parseInt(state.registeringGameId, 10);
+    const requestPayload = {
+      pickup_game: pickupGameId,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      email: formData.email,
+      phone_number: formData.phone_number,
+      age: formData.age
+    };
+
+    console.debug('[registration] submitting payload:', {
+      pickup_game: requestPayload.pickup_game,
+      first_name: requestPayload.first_name,
+      email: requestPayload.email
+    });
+
     try {
       const response = await fetch(CONFIG.API_PLAYERS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pickup_game: parseInt(state.registeringGameId),
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          email: formData.email,
-          phone_number: formData.phone_number,
-          age: formData.age
-        }),
+        body: JSON.stringify(requestPayload),
         credentials: 'include'
       });
 
+      const responseData = await response.json().catch(() => null);
+
       if (response.ok) {
-        const result = await response.json();
+        console.debug('[registration] backend response:', responseData);
+
+        const resolvedPickupGameId = Number(
+          typeof responseData?.pickup_game === 'object'
+            ? responseData?.pickup_game?.id
+            : responseData?.pickup_game
+        );
+
+        const hasRequiredFields = Boolean(responseData?.id) && Number.isFinite(resolvedPickupGameId);
+        const isExpectedGame = resolvedPickupGameId === pickupGameId;
+
+        if (!hasRequiredFields || !isExpectedGame) {
+          throw new Error(`Registration validation failed. Backend payload: ${JSON.stringify(responseData)}`);
+        }
+
         ui.showAlert('Registration successful! You have been signed up for the game.');
         // Reset the form
         DOM.registrationForm.reset();
@@ -141,7 +166,7 @@ const api = {
         // Re-fetch games to update player count
         await api.fetchGames();
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Registration failed! Try again.' }));
+        const errorData = responseData || { error: 'Registration failed! Try again.' };
         // Log the error for debugging
         console.error('Registration error:', errorData);
         throw new Error(errorData.error || errorData.detail || errorData.pickup_game || 'Registration failed! Try again.');
