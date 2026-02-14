@@ -24,6 +24,8 @@ const CONFIG = {
   DAY_ABBREVIATIONS: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 };
 
+const ensureTrailingSlash = (url) => (url.endsWith('/') ? url : `${url}/`);
+
 const runtimeConfig = {
   async load() {
     try {
@@ -63,7 +65,7 @@ const runtimeConfig = {
     CONFIG.FRONTEND_URL = nextConfig.frontendUrl;
     CONFIG.BACKEND_BASE_URL = nextConfig.backendBaseUrl;
     CONFIG.API_BASE_URL = `${nextConfig.backendBaseUrl}${nextConfig.apiPaths.games}`;
-    CONFIG.API_PLAYERS_URL = `${nextConfig.backendBaseUrl}${nextConfig.apiPaths.players}`;
+    CONFIG.API_PLAYERS_URL = ensureTrailingSlash(`${nextConfig.backendBaseUrl}${nextConfig.apiPaths.players}`);
     CONFIG.API_HEALTH_URL = `${nextConfig.backendBaseUrl}${nextConfig.apiPaths.health}`;
   }
 };
@@ -219,7 +221,7 @@ const api = {
     });
 
     try {
-      const response = await fetch(CONFIG.API_PLAYERS_URL, {
+      const response = await fetch(ensureTrailingSlash(CONFIG.API_PLAYERS_URL), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestPayload),
@@ -231,13 +233,15 @@ const api = {
       if (response.ok) {
         console.debug('[registration] backend response:', responseData);
 
+        const normalizedResponse = Array.isArray(responseData) ? responseData[0] : responseData;
+
         const resolvedPickupGameId = Number(
-          typeof responseData?.pickup_game === 'object'
-            ? responseData?.pickup_game?.id
-            : responseData?.pickup_game
+          typeof normalizedResponse?.pickup_game === 'object'
+            ? normalizedResponse?.pickup_game?.id
+            : normalizedResponse?.pickup_game
         );
 
-        const hasRequiredFields = Boolean(responseData?.id) && Number.isFinite(resolvedPickupGameId);
+        const hasRequiredFields = Boolean(normalizedResponse?.id) && Number.isFinite(resolvedPickupGameId);
         const isExpectedGame = resolvedPickupGameId === pickupGameId;
 
         if (!hasRequiredFields || !isExpectedGame) {
@@ -267,7 +271,7 @@ const api = {
   // GET players for a specific game
   async fetchPlayersForGame(gameId) {
     try {
-      const response = await fetch(`${CONFIG.API_PLAYERS_URL}/?pickup_game=${encodeURIComponent(gameId)}`, {
+      const response = await fetch(`${ensureTrailingSlash(CONFIG.API_PLAYERS_URL)}?pickup_game=${encodeURIComponent(gameId)}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
@@ -282,11 +286,11 @@ const api = {
 
       // Handle common DRF list/pagination response shapes
       if (Array.isArray(responseBody)) {
-        return responseBody;
+        return responseBody.filter(player => Number(player?.pickup_game?.id ?? player?.pickup_game) === Number(gameId));
       }
 
       if (Array.isArray(responseBody?.results)) {
-        return responseBody.results;
+        return responseBody.results.filter(player => Number(player?.pickup_game?.id ?? player?.pickup_game) === Number(gameId));
       }
 
       // Fallback for legacy game detail serializer that embeds players
