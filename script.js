@@ -144,6 +144,10 @@ const utils = {
     return String(priceValue);
   },
 
+  normalizePhoneNumber(phoneNumber) {
+    return String(phoneNumber || '').replace(/[^\d]/g, '');
+  },
+
   formatDayAndDate(isoString) {
     const date = new Date(isoString);
     const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
@@ -264,7 +268,6 @@ const api = {
       first_name: formData.first_name,
       last_name: formData.last_name,
       email: formData.email,
-      country_code: formData.country_code,
       phone_number: formData.phone_number,
       age: formData.age
     };
@@ -725,7 +728,7 @@ const events = {
         last_name: document.getElementById('last-name').value.trim(),
         email: document.getElementById('email').value.trim(),
         country_code: document.getElementById('country-code').value.trim(),
-        phone_number: document.getElementById('phone').value.trim(),
+        phone_number: `${document.getElementById('country-code').value.trim()}${utils.normalizePhoneNumber(document.getElementById('phone').value)}`,
         age: parseInt(document.getElementById('age').value, 10)
       };
 
