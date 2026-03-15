@@ -19,7 +19,6 @@ const CONFIG = {
   API_BASE_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.games}`,
   API_PLAYERS_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.players}`,
   API_HEALTH_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.health}`,
-  GAME_DURATION_HOURS: 2,
   DAYS_OF_WEEK: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
   DAY_ABBREVIATIONS: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 };
@@ -101,12 +100,26 @@ const DOM = {
 // Utility Functions
 // ============================================
 const utils = {
-  formatGameTime(isoString) {
-    const startTime = new Date(isoString);
-    const endTime = new Date(startTime.getTime() + (CONFIG.GAME_DURATION_HOURS * 60 * 60 * 1000));
-
+  formatGameTime(startIsoString, endIsoString) {
     const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+    const startTime = new Date(startIsoString);
+
+    if (Number.isNaN(startTime.getTime())) {
+      return 'Time TBD';
+    }
+
     const start = startTime.toLocaleTimeString('en-US', timeOptions);
+
+    if (!endIsoString) {
+      return start;
+    }
+
+    const endTime = new Date(endIsoString);
+
+    if (Number.isNaN(endTime.getTime())) {
+      return start;
+    }
+
     const end = endTime.toLocaleTimeString('en-US', timeOptions);
 
     return `${start} - ${end}`;
@@ -384,23 +397,26 @@ const ui = {
   },
 
   createGameCard(game) {
-    const spotsLeft = game.max_players - game.current_players;
+    const maxPlayers = Number(game.max_players) || 0;
+    const currentPlayers = Number(game.current_players) || 0;
+    const spotsLeft = Math.max(0, maxPlayers - currentPlayers);
+    const isFull = spotsLeft === 0;
     const gameType = game.sport || 'Soccer';
 
     return `
       <article class="game-card">
         <div class="game-header">
           <span class="game-type">${gameType}</span>
-          <span class="spots-left">${spotsLeft} spots left</span>
+          <span class="spots-left">${isFull ? 'Game full' : `${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left`}</span>
         </div>
         <h3 class="game-title">${game.location} Pickup</h3>
         <div class="game-info">
-          <p class="game-time">${utils.formatGameTime(game.time)}</p>
+          <p class="game-time">${utils.formatGameTime(game.time, game.end_time)}</p>
           <p class="game-location">${game.location}</p>
         </div>
         <div class="game-buttons">
-          <button class="join-btn" data-game-id="${game.id}" data-game-title="${game.location} Pickup">
-            Join Game
+          <button class="join-btn" data-game-id="${game.id}" data-game-title="${game.location} Pickup" ${isFull ? 'disabled aria-disabled="true"' : ''}>
+            ${isFull ? 'Game Full' : 'Join Game'}
           </button>
           <button class="players-btn" data-game-id="${game.id}" data-game-title="${game.location} Pickup">
             List of Players
@@ -445,6 +461,10 @@ const ui = {
   attachJoinButtonListeners() {
     document.querySelectorAll('.join-btn').forEach(button => {
       button.addEventListener('click', function() {
+        if (this.disabled) {
+          return;
+        }
+
         state.registeringGameId = this.dataset.gameId;
         DOM.gameTitleSpan.textContent = this.dataset.gameTitle;
         modal.open();
