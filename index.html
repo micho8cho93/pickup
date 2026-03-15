@@ -39,9 +39,9 @@
       <p class="modal-subtitle">Fill in your details to register for this game</p>
       
       <form class="registration-form" id="registration-form" novalidate>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="first-name">First Name</label>
+	        <div class="form-row">
+	          <div class="form-group">
+	            <label for="first-name">First Name</label>
             <input type="text" id="first-name" name="first-name" required aria-required="true">
             <span class="error-message"></span>
           </div>
@@ -56,19 +56,24 @@
           <label for="email">Email Address</label>
           <input type="email" id="email" name="email" required aria-required="true">
           <span class="error-message"></span>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="phone">Phone Number</label>
-            <input type="tel" id="phone" name="phone" required aria-required="true">
-            <span class="error-message"></span>
-          </div>
-          <div class="form-group">
-            <label for="age">Age</label>
-            <input type="number" id="age" name="age" min="13" max="99" required aria-required="true">
-            <span class="error-message"></span>
-          </div>
+	        </div>
+	
+	        <div class="form-row form-row--contact">
+	          <div class="form-group form-group--phone">
+	            <label for="phone">WhatsApp Number</label>
+	            <input type="tel" id="phone" name="phone" required aria-required="true">
+	            <span class="error-message"></span>
+	          </div>
+	          <div class="form-group form-group--country-code">
+	            <label for="country-code">Country Code</label>
+	            <input type="text" id="country-code" name="country-code" placeholder="+34" required aria-required="true">
+	            <span class="error-message"></span>
+	          </div>
+	          <div class="form-group form-group--age">
+	            <label for="age">Age</label>
+	            <input type="number" id="age" name="age" min="13" max="99" required aria-required="true">
+	            <span class="error-message"></span>
+	          </div>
         </div>
 
         <button type="submit" class="submit-btn">Register for Game</button>

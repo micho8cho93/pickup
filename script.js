@@ -125,6 +125,25 @@ const utils = {
     return `${start} - ${end}`;
   },
 
+  formatGamePrice(priceValue) {
+    if (priceValue === null || priceValue === undefined || priceValue === '') {
+      return 'Price TBD';
+    }
+
+    const numericPrice = Number(priceValue);
+
+    if (Number.isFinite(numericPrice)) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+      }).format(numericPrice);
+    }
+
+    return String(priceValue);
+  },
+
   formatDayAndDate(isoString) {
     const date = new Date(isoString);
     const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
@@ -245,6 +264,7 @@ const api = {
       first_name: formData.first_name,
       last_name: formData.last_name,
       email: formData.email,
+      country_code: formData.country_code,
       phone_number: formData.phone_number,
       age: formData.age
     };
@@ -402,6 +422,7 @@ const ui = {
     const spotsLeft = Math.max(0, maxPlayers - currentPlayers);
     const isFull = spotsLeft === 0;
     const gameType = game.sport || 'Soccer';
+    const gamePrice = utils.formatGamePrice(game.price);
 
     return `
       <article class="game-card">
@@ -413,6 +434,7 @@ const ui = {
         <div class="game-info">
           <p class="game-time">${utils.formatGameTime(game.time, game.end_time)}</p>
           <p class="game-location">${game.location}</p>
+          <p class="game-price">${gamePrice}</p>
         </div>
         <div class="game-buttons">
           <button class="join-btn" data-game-id="${game.id}" data-game-title="${game.location} Pickup" ${isFull ? 'disabled aria-disabled="true"' : ''}>
@@ -588,7 +610,12 @@ const validation = {
     'phone': {
       required: true,
       pattern: /^[\d\s\-\(\)]+$/,
-      message: 'Please enter a valid phone number'
+      message: 'Please enter a valid WhatsApp number'
+    },
+    'country-code': {
+      required: true,
+      pattern: /^\+[1-9]\d{0,3}$/,
+      message: 'Please enter a valid country code like +34'
     },
     'age': {
       required: true,
@@ -697,6 +724,7 @@ const events = {
         first_name: document.getElementById('first-name').value.trim(),
         last_name: document.getElementById('last-name').value.trim(),
         email: document.getElementById('email').value.trim(),
+        country_code: document.getElementById('country-code').value.trim(),
         phone_number: document.getElementById('phone').value.trim(),
         age: parseInt(document.getElementById('age').value, 10)
       };
