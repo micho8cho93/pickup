@@ -190,6 +190,12 @@ select {
   gap: var(--space-2);
 }
 
+.day-card-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .day-card {
   display: flex;
   flex-direction: column;
@@ -204,6 +210,12 @@ select {
   cursor: pointer;
   padding: 0.95rem 1rem;
   transition: transform var(--transition-base), border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.day-card,
+.join-btn,
+.players-btn {
+  width: 100%;
 }
 
 .day-card:hover {
@@ -243,6 +255,10 @@ select {
 
 .day-card.active .day-date {
   color: var(--brand-green);
+}
+
+.day-card-games {
+  display: none;
 }
 
 .games-list {
@@ -437,6 +453,10 @@ select {
   color: var(--text-secondary);
 }
 
+.no-games--mobile {
+  padding: var(--space-3);
+}
+
 .error-message-box {
   color: #8f6c0f;
   border-color: rgba(240, 201, 75, 0.48);
@@ -551,7 +571,8 @@ select {
   letter-spacing: 0.08em;
 }
 
-.form-group input {
+.form-group input,
+.form-group select {
   width: 100%;
   border: 1px solid rgba(45, 140, 71, 0.16);
   border-radius: var(--radius-sm);
@@ -566,13 +587,15 @@ select {
   color: #8ba08f;
 }
 
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
   border-color: rgba(143, 214, 166, 0.78);
   box-shadow: 0 0 0 4px rgba(45, 140, 71, 0.12);
 }
 
-.form-group input.error {
+.form-group input.error,
+.form-group select.error {
   border-color: rgba(242, 205, 75, 0.9);
   box-shadow: 0 0 0 3px rgba(242, 205, 75, 0.14);
 }
@@ -584,7 +607,7 @@ select {
 }
 
 .form-group--country-code input,
-.form-group--age input {
+.form-group--player-level select {
   text-align: center;
 }
 
@@ -622,7 +645,8 @@ select {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 2px solid rgba(45, 140, 71, 0.7);
   outline-offset: 2px;
 }
@@ -636,7 +660,7 @@ input:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .form-group--age {
+  .form-group--player-level {
     grid-column: 1 / -1;
   }
 }
@@ -665,8 +689,36 @@ input:focus-visible {
     align-items: stretch;
   }
 
+  .games-section {
+    display: none;
+  }
+
+  .day-card-games.active {
+    display: grid;
+    animation: mobileDayGamesIn var(--transition-base);
+  }
+
+  .game-cards--mobile {
+    padding: 0 var(--space-1) var(--space-1);
+  }
+
+  .game-cards--mobile .game-card {
+    box-shadow: 0 14px 28px rgba(45, 86, 53, 0.08);
+  }
+
   .modal-content {
     max-height: calc(100vh - 1rem);
+  }
+}
+
+@keyframes mobileDayGamesIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

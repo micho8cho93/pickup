@@ -1,10 +1,29 @@
 // ============================================
 // Configuration
 // ============================================
+const resolveRuntimeDefaults = () => {
+  const { hostname, origin } = window.location;
+  const isLocalDevelopment = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isGitHubPages = hostname.endsWith('github.io');
+
+  return {
+    environment: isLocalDevelopment ? 'development' : 'production',
+    frontendUrl: new URL('/pickup/', origin).toString(),
+    backendBaseUrl: isLocalDevelopment
+      ? 'http://localhost:8000'
+      : isGitHubPages
+        ? 'https://testliga.up.railway.app'
+        : origin,
+    apiPaths: {
+      games: '/futbol/api/games',
+      players: '/futbol/api/game-players',
+      health: '/futbol/api/health'
+    }
+  };
+};
+
 const DEFAULT_RUNTIME_CONFIG = {
-  environment: 'production',
-  frontendUrl: 'https://<github-username>.github.io/pickup/',
-  backendBaseUrl: 'https://testliga.up.railway.app',
+  ...resolveRuntimeDefaults(),
   apiPaths: {
     games: '/futbol/api/games',
     players: '/futbol/api/game-players',
@@ -18,17 +37,29 @@ const CONFIG = {
   BACKEND_BASE_URL: DEFAULT_RUNTIME_CONFIG.backendBaseUrl,
   API_BASE_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.games}`,
   API_PLAYERS_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.players}`,
-  API_HEALTH_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.health}`,
-  DAYS_OF_WEEK: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-  DAY_ABBREVIATIONS: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+  API_HEALTH_URL: `${DEFAULT_RUNTIME_CONFIG.backendBaseUrl}${DEFAULT_RUNTIME_CONFIG.apiPaths.health}`
 };
 
 const ensureTrailingSlash = (url) => (url.endsWith('/') ? url : `${url}/`);
 
 const runtimeConfig = {
   async load() {
+    const embeddedConfig = window.PICKUP_RUNTIME_CONFIG;
+
+    if (embeddedConfig) {
+      const merged = this.mergeWithDefaults({
+        currentEnvironment: embeddedConfig.environment || DEFAULT_RUNTIME_CONFIG.environment,
+        environments: {
+          [embeddedConfig.environment || DEFAULT_RUNTIME_CONFIG.environment]: embeddedConfig
+        }
+      });
+      this.apply(merged);
+      console.info(`[startup] Loaded embedded runtime config for "${CONFIG.ENVIRONMENT}"`);
+      return;
+    }
+
     try {
-      const response = await fetch('config.json', { cache: 'no-store' });
+      const response = await fetch(new URL('./config.json', import.meta.url), { cache: 'no-store' });
 
       if (!response.ok) {
         throw new Error(`Unable to load config.json (status ${response.status})`);
@@ -74,7 +105,7 @@ const runtimeConfig = {
 // ============================================
 const state = {
   games: [],
-  selectedDay: 'monday',
+  selectedDay: null,
   registeringGameId: null,
   backendMetadata: null
 };
@@ -159,40 +190,46 @@ const utils = {
     return new Date(isoString).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   },
 
+  getDayKey(date) {
+    return date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  },
+
+  getCurrentDayKey() {
+    return this.getDayKey(new Date());
+  },
+
   capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   },
 
-  getCurrentWeekDates() {
+  getVisibleDates() {
     const today = new Date();
-    const currentDay = today.getDay();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
+    today.setHours(0, 0, 0, 0);
 
-    return CONFIG.DAYS_OF_WEEK.map((_, index) => {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + index);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() + index);
       return date;
     });
   },
 
-  getCurrentWeekRange() {
-    const weekDates = this.getCurrentWeekDates();
-    const weekStart = new Date(weekDates[0]);
-    weekStart.setHours(0, 0, 0, 0);
+  getVisibleRange() {
+    const visibleDates = this.getVisibleDates();
+    const rangeStart = new Date(visibleDates[0]);
+    rangeStart.setHours(0, 0, 0, 0);
 
-    const weekEnd = new Date(weekDates[6]);
-    weekEnd.setHours(23, 59, 59, 999);
+    const rangeEnd = new Date(visibleDates[6]);
+    rangeEnd.setHours(23, 59, 59, 999);
 
-    return { weekStart, weekEnd };
+    return { rangeStart, rangeEnd };
   },
 
-  filterGamesForCurrentWeek(games) {
-    const { weekStart, weekEnd } = this.getCurrentWeekRange();
+  filterGamesForVisibleRange(games) {
+    const { rangeStart, rangeEnd } = this.getVisibleRange();
 
     return games.filter(game => {
       const gameDate = new Date(game.time);
-      return gameDate >= weekStart && gameDate <= weekEnd;
+      return gameDate >= rangeStart && gameDate <= rangeEnd;
     });
   }
 };
@@ -244,11 +281,19 @@ const api = {
       }
 
       const games = await response.json();
-      const currentWeekGames = utils.filterGamesForCurrentWeek(games);
+      const visibleGames = utils.filterGamesForVisibleRange(games);
+      const visibleDayKeys = utils.getVisibleDates().map(date => utils.getDayKey(date));
+      const todayKey = utils.getCurrentDayKey();
 
-      state.games = currentWeekGames;
-      ui.renderGames(currentWeekGames);
-      ui.renderDayCards(currentWeekGames);
+      if (!state.selectedDay || !visibleDayKeys.includes(state.selectedDay)) {
+        state.selectedDay = todayKey;
+      }
+
+      state.games = visibleGames;
+      ui.renderDayCards(visibleGames);
+      ui.renderGames(visibleGames);
+      ui.showSelectedGames(state.selectedDay);
+      ui.attachJoinButtonListeners();
     } catch (error) {
       console.error('Could not fetch pickup games:', error);
       ui.showError('Error loading games. Please check your connection and try again.');
@@ -269,7 +314,7 @@ const api = {
       last_name: formData.last_name,
       email: formData.email,
       phone_number: formData.phone_number,
-      age: formData.age
+      player_level: formData.player_level
     };
 
     console.debug('[registration] submitting payload:', {
@@ -369,21 +414,29 @@ const api = {
 // ============================================
 const ui = {
   renderDayCards(games) {
-    const weekDates = utils.getCurrentWeekDates();
+    const visibleDates = utils.getVisibleDates();
     const gameCounts = this.calculateGameCounts(games);
+    const gamesByDay = this.groupGamesByDay(games);
 
-    DOM.daysGrid.innerHTML = weekDates.map((date, index) => {
-      const day = CONFIG.DAYS_OF_WEEK[index];
+    DOM.daysGrid.innerHTML = visibleDates.map((date) => {
+      const day = utils.getDayKey(date);
       const count = gameCounts[day] || 0;
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
       const dayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const isActive = day === state.selectedDay ? 'active' : '';
+      const mobileGames = this.createMobileDayGames(day, gamesByDay[day]);
 
       return `
-        <button class="day-card ${isActive}" data-day="${day}">
-          <span class="day-name">${CONFIG.DAY_ABBREVIATIONS[index]}</span>
-          <span class="day-date">${dayDate}</span>
-          <span class="game-count">${count} game${count !== 1 ? 's' : ''}</span>
-        </button>
+        <div class="day-card-stack">
+          <button class="day-card ${isActive}" data-day="${day}" aria-expanded="${day === state.selectedDay}" aria-controls="mobile-games-${day}">
+            <span class="day-name">${dayName}</span>
+            <span class="day-date">${dayDate}</span>
+            <span class="game-count">${count} game${count !== 1 ? 's' : ''}</span>
+          </button>
+          <div class="day-card-games ${isActive}" id="mobile-games-${day}" data-day-panel="${day}">
+            ${mobileGames}
+          </div>
+        </div>
       `;
     }).join('');
 
@@ -400,14 +453,25 @@ const ui = {
 
   renderGames(games) {
     const gamesByDay = this.groupGamesByDay(games);
+    const visibleDayKeys = utils.getVisibleDates().map(date => utils.getDayKey(date));
 
-    DOM.gamesListContainer.innerHTML = CONFIG.DAYS_OF_WEEK.map(day => `
+    DOM.gamesListContainer.innerHTML = visibleDayKeys.map(day => `
       <div class="game-cards" data-day="${day}" style="display: ${day === state.selectedDay ? 'grid' : 'none'}">
         ${gamesByDay[day] ? gamesByDay[day].map(game => this.createGameCard(game)).join('') : '<p class="no-games">No games scheduled for this day.</p>'}
       </div>
     `).join('');
+  },
 
-    this.attachJoinButtonListeners();
+  createMobileDayGames(day, gamesForDay = []) {
+    if (!gamesForDay.length) {
+      return '<p class="no-games no-games--mobile">No games scheduled for this day.</p>';
+    }
+
+    return `
+      <div class="game-cards game-cards--mobile" data-day="${day}">
+        ${gamesForDay.map(game => this.createGameCard(game)).join('')}
+      </div>
+    `;
   },
 
   groupGamesByDay(games) {
@@ -453,7 +517,21 @@ const ui = {
 
   showSelectedGames(selectedDay) {
     document.querySelectorAll('.game-cards').forEach(cards => {
+      if (cards.classList.contains('game-cards--mobile')) {
+        return;
+      }
+
       cards.style.display = cards.dataset.day === selectedDay ? 'grid' : 'none';
+    });
+
+    document.querySelectorAll('.day-card').forEach(card => {
+      const isSelected = card.dataset.day === selectedDay;
+      card.classList.toggle('active', isSelected);
+      card.setAttribute('aria-expanded', String(isSelected));
+    });
+
+    document.querySelectorAll('.day-card-games').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.dayPanel === selectedDay);
     });
 
     DOM.selectedDayText.textContent = utils.capitalizeFirstLetter(selectedDay);
@@ -476,8 +554,6 @@ const ui = {
   attachDayCardListeners() {
     document.querySelectorAll('.day-card').forEach(card => {
       card.addEventListener('click', function() {
-        document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active'));
-        this.classList.add('active');
         ui.showSelectedGames(this.dataset.day);
       });
     });
@@ -525,8 +601,8 @@ const modal = {
 
   clearErrors() {
     document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
-    document.querySelectorAll('.form-group input').forEach(input => {
-      input.classList.remove('error');
+    document.querySelectorAll('.form-group input, .form-group select').forEach(field => {
+      field.classList.remove('error');
     });
   }
 };
@@ -620,11 +696,9 @@ const validation = {
       pattern: /^\+[1-9]\d{0,3}$/,
       message: 'Please enter a valid country code like +34'
     },
-    'age': {
+    'player-level': {
       required: true,
-      min: 13,
-      max: 99,
-      message: 'Age must be between 13 and 99'
+      message: 'Please choose a player level'
     }
   },
 
@@ -650,16 +724,6 @@ const validation = {
       return false;
     }
 
-    if (rule.min && parseInt(value, 10) < rule.min) {
-      this.showError(input, errorElement, rule.message);
-      return false;
-    }
-
-    if (rule.max && parseInt(value, 10) > rule.max) {
-      this.showError(input, errorElement, rule.message);
-      return false;
-    }
-
     this.clearError(input, errorElement);
     return true;
   },
@@ -675,7 +739,7 @@ const validation = {
   },
 
   validateForm(form) {
-    const inputs = form.querySelectorAll('input[required]');
+    const inputs = form.querySelectorAll('input[required], select[required]');
     let isValid = true;
 
     inputs.forEach(input => {
@@ -729,18 +793,23 @@ const events = {
         email: document.getElementById('email').value.trim(),
         country_code: document.getElementById('country-code').value.trim(),
         phone_number: `${document.getElementById('country-code').value.trim()}${utils.normalizePhoneNumber(document.getElementById('phone').value)}`,
-        age: parseInt(document.getElementById('age').value, 10)
+        player_level: document.getElementById('player-level').value
       };
 
       await api.submitRegistration(formData);
     });
 
     // Real-time validation
-    DOM.registrationForm.querySelectorAll('input').forEach(input => {
-      input.addEventListener('blur', () => validation.validateField(input));
-      input.addEventListener('input', () => {
-        if (input.classList.contains('error')) {
-          validation.validateField(input);
+    DOM.registrationForm.querySelectorAll('input, select').forEach(field => {
+      field.addEventListener('blur', () => validation.validateField(field));
+      field.addEventListener('change', () => {
+        if (field.classList.contains('error')) {
+          validation.validateField(field);
+        }
+      });
+      field.addEventListener('input', () => {
+        if (field.classList.contains('error')) {
+          validation.validateField(field);
         }
       });
     });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pickup Games - Weekly Schedule</title>
+  <title>Pickup Games - Next 7 Days</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
@@ -18,13 +18,13 @@
       <header class="header">
         <p class="kicker">Soccer Social Network</p>
         <h1>Pickup Games</h1>
-        <p class="subtitle">Discover this week’s local football matches, check availability, and lock in your spot in seconds.</p>
+        <p class="subtitle">Discover pickup football matches over the next 7 days, check availability, and lock in your spot in seconds.</p>
       </header>
 
       <section class="week-calendar panel" aria-labelledby="schedule-heading">
         <div class="section-heading">
-          <p class="section-label">Weekly Planner</p>
-          <h2 class="section-title" id="schedule-heading">This Week&apos;s Schedule</h2>
+          <p class="section-label">7-Day Planner</p>
+          <h2 class="section-title" id="schedule-heading">Next 7 Days</h2>
         </div>
         <div class="days-grid" id="days-grid">
           <!-- Days will be dynamically generated -->
@@ -37,13 +37,13 @@
             <p class="section-label">Match Availability</p>
             <h2 class="section-title" id="games-heading">Available Games</h2>
           </div>
-          <p class="day-pill" aria-live="polite">Showing: <span id="selected-day">Monday</span></p>
+          <p class="day-pill" aria-live="polite">Showing: <span id="selected-day">Today</span></p>
         </div>
 
         <div class="games-list" id="games-list" aria-live="polite">
           <div class="loading-spinner">
             <div class="spinner" aria-hidden="true"></div>
-            <p>Loading games for the current week...</p>
+            <p>Loading games for the next 7 days...</p>
           </div>
         </div>
       </section>
@@ -89,9 +89,14 @@
             <input type="tel" id="phone" name="phone" required aria-required="true" autocomplete="tel-national">
             <span class="error-message"></span>
           </div>
-          <div class="form-group form-group--age">
-            <label for="age">Age</label>
-            <input type="number" id="age" name="age" min="13" max="99" required aria-required="true">
+          <div class="form-group form-group--player-level">
+            <label for="player-level">Player Level</label>
+            <select id="player-level" name="player-level" required aria-required="true">
+              <option value="">Select level</option>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="genius">Genius</option>
+            </select>
             <span class="error-message"></span>
           </div>
         </div>
