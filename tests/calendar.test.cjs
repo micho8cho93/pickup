@@ -6,14 +6,15 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'script.js'), 'utf8')
   .replaceAll('import.meta.url', "'https://example.test/script.js'")
-  .replace(/\/\/ Start the application when DOM is ready[\s\S]*$/, 'globalThis.testExports = { utils, ui };');
+  .replace(/\/\/ Start the application when DOM is ready[\s\S]*$/, 'globalThis.testExports = { utils, ui, state, DOM };');
+const elements = {};
 const context = {
   window: { location: { hostname: 'localhost', origin: 'http://localhost:3000' } },
-  document: { getElementById: () => ({}) },
+  document: { getElementById: id => (elements[id] ||= { innerHTML: '' }) },
   URL,
 };
 vm.runInNewContext(source, context);
-const { utils, ui } = context.testExports;
+const { utils, ui, state, DOM } = context.testExports;
 
 test('calendar shows today and 29 further dates across month and week boundaries', () => {
   const dates = utils.getVisibleDates();
@@ -48,4 +49,24 @@ test('game title links valid Maps URLs and safely renders legacy or invalid link
   });
   assert.doesNotMatch(unsafe, /<img/);
   assert.doesNotMatch(unsafe, /class="location-link"/);
+});
+
+test('calendar highlights game dates and day modal contains every game for that date', () => {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const day = utils.getDayKey(today);
+  const games = ['North Field', 'South Field'].map((location, index) => ({
+    id: index + 1, location, time: today.toISOString(), max_players: 10,
+    current_players: 2, price: 5,
+  }));
+
+  state.games = games;
+  ui.renderDayCards(games);
+  assert.match(DOM.daysGrid.innerHTML, new RegExp(`class="day-card has-games" data-day="${day}"`));
+  assert.equal((DOM.daysGrid.innerHTML.match(/class="day-card has-games"/g) || []).length, 1);
+
+  ui.renderGamesForDay(day);
+  assert.equal((DOM.gamesListContainer.innerHTML.match(/<article class="game-card">/g) || []).length, 2);
+  assert.match(DOM.gamesListContainer.innerHTML, /North Field/);
+  assert.match(DOM.gamesListContainer.innerHTML, /South Field/);
 });
