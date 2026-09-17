@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "serve": "npx live-server --port=3000 --no-browser",
-    "dev": "npx live-server --port=3000"
+    "dev": "npx live-server --port=3000",
+    "test": "node --test tests/*.test.cjs"
   },
   "devDependencies": {
     "live-server": "^1.2.2"
