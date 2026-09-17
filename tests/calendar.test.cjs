@@ -58,7 +58,7 @@ test('full games offer a waitlist signup', () => {
     id: 10, location: 'North Field', time: new Date().toISOString(),
     max_players: 1, current_players: 1, waitlist_count: 2,
   });
-  assert.match(card, /Full · 2 waitlisted/);
+  assert.match(card, /<span class="spots-left spots-left--full">Waitlist open<\/span>/);
   assert.match(card, /Join Waitlist/);
   assert.doesNotMatch(card, /disabled aria-disabled/);
 });
