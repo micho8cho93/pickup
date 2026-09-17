@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'script.js'), 'utf8')
   .replaceAll('import.meta.url', "'https://example.test/script.js'")
-  .replace(/\/\/ Start the application when DOM is ready[\s\S]*$/, 'globalThis.testExports = { utils, ui, state, DOM };');
+  .replace(/\/\/ Start the application when DOM is ready[\s\S]*$/, 'globalThis.testExports = { utils, ui, state, DOM, playersModal };');
 const elements = {};
 const context = {
   window: { location: { hostname: 'localhost', origin: 'http://localhost:3000' } },
@@ -14,7 +14,7 @@ const context = {
   URL,
 };
 vm.runInNewContext(source, context);
-const { utils, ui, state, DOM } = context.testExports;
+const { utils, ui, state, DOM, playersModal } = context.testExports;
 
 test('calendar shows today and 29 further dates across month and week boundaries', () => {
   const dates = utils.getVisibleDates();
@@ -38,6 +38,8 @@ test('game title links valid Maps URLs and safely renders legacy or invalid link
     time: new Date().toISOString(), max_players: 10, current_players: 0, price: 5,
   };
   const linked = ui.createGameCard(game);
+  assert.match(linked, /<h3 class="game-title">Downtown Pickup<\/h3>/);
+  assert.match(linked, /<p class="game-location"><a class="location-link"/);
   assert.match(linked, /class="location-link"/);
   assert.match(linked, /href="https:\/\/maps\.app\.goo\.gl\/abc\?x=1&amp;y=2"/);
 
@@ -49,6 +51,27 @@ test('game title links valid Maps URLs and safely renders legacy or invalid link
   });
   assert.doesNotMatch(unsafe, /<img/);
   assert.doesNotMatch(unsafe, /class="location-link"/);
+});
+
+test('full games offer a waitlist signup', () => {
+  const card = ui.createGameCard({
+    id: 10, location: 'North Field', time: new Date().toISOString(),
+    max_players: 1, current_players: 1, waitlist_count: 2,
+  });
+  assert.match(card, /Full · 2 waitlisted/);
+  assert.match(card, /Join Waitlist/);
+  assert.doesNotMatch(card, /disabled aria-disabled/);
+});
+
+test('player list labels confirmed and waitlisted signups', () => {
+  playersModal.renderPlayers([
+    { id: 2, first_name: 'Second', last_name: 'Player', is_waitlisted: true },
+    { id: 1, first_name: 'First', last_name: 'Player', is_waitlisted: false },
+  ]);
+  const markup = DOM.playersList.innerHTML;
+  assert.match(markup, /First Player<\/span>\s*<span class="player-status ">Confirmed/);
+  assert.match(markup, /Second Player<\/span>\s*<span class="player-status player-status--waitlisted">Waitlisted/);
+  assert.ok(markup.indexOf('First Player') < markup.indexOf('Second Player'));
 });
 
 test('calendar highlights game dates and day modal contains every game for that date', () => {
